@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>演出票价计算器（离线版）</title>
+<style>
+:root{font-family:system-ui,-apple-system,"Microsoft YaHei",sans-serif;color:#202124;background:#f5f6f8}*{box-sizing:border-box}body{margin:0;padding:16px;max-width:1050px;margin-inline:auto}h1{font-size:1.5rem;margin:.2rem 0}.sub,.note{color:#62676f;font-size:.88rem;line-height:1.5}.sub{margin:0 0 16px}.card{background:white;border:1px solid #e0e3e7;border-radius:14px;padding:15px;margin:12px 0}h2{font-size:1.08rem;margin:0 0 12px}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}label{display:block;font-size:.9rem;color:#4b5057;margin-bottom:5px}input,select,button{font:inherit}input,select{width:100%;padding:9px;border:1px solid #c8ccd2;border-radius:8px;background:white;color:#202124}button{border:1px solid #c8ccd2;background:white;padding:9px 12px;border-radius:8px;cursor:pointer}.primary{background:#185abc;color:white;border-color:#185abc}.danger{color:#b3261e}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.actions button{flex:1}.metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.metric{background:#f5f7fa;border-radius:10px;padding:12px}.metric span{display:block;color:#62676f;font-size:.83rem}.metric strong{display:block;font-size:1.25rem;margin-top:4px;overflow-wrap:anywhere}.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:560px}th,td{text-align:right;padding:8px 6px;border-bottom:1px solid #eee}th:first-child,td:first-child{text-align:left}td input{min-width:72px}.cost-row{display:grid;grid-template-columns:auto minmax(90px,1fr) minmax(100px,150px) auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #eee}.cost-row input[type=checkbox]{width:18px;height:18px}.cost-row label{margin:0;color:#202124}.warn{color:#b3261e}.good{color:#137333}@media(min-width:700px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:420px){body{padding:9px}.card{padding:11px}.cost-row{grid-template-columns:auto minmax(60px,1fr) minmax(78px,100px) auto;gap:5px}.cost-row input,.cost-row button{padding:7px 5px}.metric strong{font-size:1.08rem}}
+</style></head><body>
+<h1>演出票价计算器</h1><p class="sub">离线单文件版 · 可设置不同区域票价、座位数和售出人数 · 无需联网</p>
+<section class="card"><h2>1. 场地与分成规则</h2><div class="grid">
+<div><label for="totalSeats">场地总座位数（校验用）</label><input id="totalSeats" type="number" min="0" value="600"></div>
+<div><label for="target">目标利润（元）</label><input id="target" type="number" min="0" value="20000"></div>
+<div><label for="share">团队分成比例（%）</label><input id="share" type="number" min="0" max="100" step=".1" value="40"></div>
+<div><label for="mode">团队分成方式</label><select id="mode"><option value="gross">按总票房分成</option><option value="net">扣成本后按正利润分成</option></select></div>
+</div><p id="seatSummary" class="note"></p></section>
+<section class="card"><h2>2. 分区票价与人数（可自由添加区域）</h2><p class="note">每个区域分别设置座位容量、票价、已售/预计售票人数。总票房按各区域「票价 × 售票人数」相加；各区域售票人数不能超过该区座位数。</p>
+<div class="tablewrap"><table><thead><tr><th>区域名称</th><th>座位数</th><th>票价（元）</th><th>售票人数</th><th>票房</th><th></th></tr></thead><tbody id="zones"></tbody></table></div>
+<div class="actions"><button id="addZone" class="primary">＋ 添加座位区域</button><button id="resetZones">恢复默认区域</button></div></section>
+<section class="card"><h2>3. 成本项目（可添加、删除、排除）</h2><div id="costs"></div><div class="actions"><button id="addCost" class="primary">＋ 添加成本项目</button><button id="resetCosts">恢复默认成本</button></div><p class="note">固定金额填整场合计；比例费用填票房百分比。取消计入即可排除。团队额外费用可用于填写演出团队的交通、住宿等额外支出，避免与分成重复计算。</p></section>
+<section class="card"><h2>4. 计算结果</h2><div class="metrics">
+<div class="metric"><span>售票总人数</span><strong id="soldTotal">—</strong></div><div class="metric"><span>综合上座率</span><strong id="occupancy">—</strong></div><div class="metric"><span>总票房</span><strong id="revenue">—</strong></div><div class="metric"><span>加权平均票价</span><strong id="avgTicket">—</strong></div><div class="metric"><span>固定成本</span><strong id="fixed">—</strong></div><div class="metric"><span>票房比例费用</span><strong id="variable">—</strong></div><div class="metric"><span>团队分成</span><strong id="teamPay">—</strong></div><div class="metric"><span>我方经营结余</span><strong id="profit">—</strong></div><div class="metric"><span>保本综合票价</span><strong id="breakEven">—</strong></div><div class="metric" style="grid-column:1/-1"><span>达到目标利润所需综合平均票价（按现有各区售票人数比例缩放）</span><strong id="targetTicket">—</strong></div>
+</div><p id="warning" class="warn"></p><p class="note">保本/目标票价是所有区域统一按比例调整后的综合平均票价估算；分区实际定价时，请以各区票价和售票人数的票房合计为准。经营结余不是最终会计净利润。</p></section>
+<section class="card"><h2>5. 上座率敏感性分析</h2><p class="note">按每个区域当前容量、票价和各区售票比例，模拟整体上座率变化。</p><div class="tablewrap"><table><thead><tr><th>整体上座率</th><th>售票人数</th><th>预计票房</th><th>我方经营结余</th></tr></thead><tbody id="sensitivity"></tbody></table></div></section>
+<section class="card"><h2>6. 导出与备份</h2><div class="actions"><button id="exportCsv">导出计算结果 CSV</button><button id="saveJson">导出参数备份 JSON</button><button id="loadJson">导入参数备份 JSON</button><button id="resetAll" class="danger">恢复全部默认值</button></div><input id="jsonFile" type="file" accept=".json,application/json" hidden><p class="note">下载后用手机或电脑浏览器打开此 HTML 文件即可离线使用。参数备份 JSON 可在下次打开时导入。</p></section>
+<script>
+const $=id=>document.getElementById(id), num=v=>Math.max(0,Number(v)||0);
+const money=v=>Number.isFinite(v)?v.toLocaleString('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:2}):'无法计算';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const defaultZones=[{name:'VIP区',seats:50,price:380,sold:50},{name:'A区',seats:150,price:280,sold:145},{name:'B区',seats:200,price:180,sold:190},{name:'C区',seats:200,price:100,sold:185}];
+const defaultCosts=[{name:'场地租金',type:'fixed',value:30000,enabled:true},{name:'工作人员工资（5人合计）',type:'fixed',value:3000,enabled:true},{name:'团队额外费用（16人）',type:'fixed',value:0,enabled:false},{name:'宣传推广费',type:'fixed',value:3000,enabled:true},{name:'其他固定费用',type:'fixed',value:2000,enabled:true},{name:'票务手续费',type:'percent',value:3,enabled:true},{name:'税费预估',type:'percent',value:0,enabled:false}];
+let zones=structuredClone(defaultZones),costs=structuredClone(defaultCosts);
+function renderZones(){
+ $('zones').innerHTML=zones.map((z,i)=>`<tr data-i="${i}"><td><input class="zname" aria-label="区域名称" value="${esc(z.name)}"></td><td><input class="zseats" aria-label="区域座位数" type="number" min="0" step="1" value="${z.seats}"></td><td><input class="zprice" aria-label="区域票价" type="number" min="0" step=".01" value="${z.price}"></td><td><input class="zsold" aria-label="区域售票人数" type="number" min="0" step="1" value="${z.sold}"></td><td class="zrev">${money(Math.min(num(z.sold),num(z.seats))*num(z.price))}</td><td><button class="danger zremove">删除</button></td></tr>`).join('');
+ $('zones').querySelectorAll('tr').forEach((row,i)=>{[['.zname','name'],['.zseats','seats'],['.zprice','price'],['.zsold','sold']].forEach(([sel,key])=>row.querySelector(sel).addEventListener('input',e=>{zones[i][key]=key==='name'?e.target.value:num(e.target.value);calculate()}));row.querySelector('.zremove').addEventListener('click',()=>{zones.splice(i,1);renderZones();calculate()})});
+}
+function renderCosts(){
+ $('costs').innerHTML=costs.map((c,i)=>`<div class="cost-row"><input type="checkbox" class="enabled" aria-label="计入成本" ${c.enabled?'checked':''}><input class="cname" aria-label="成本名称" value="${esc(c.name)}"><div><input class="cvalue" aria-label="金额或比例" type="number" min="0" step=".01" value="${c.value}"><select class="ctype" aria-label="成本类型"><option value="fixed" ${c.type==='fixed'?'selected':''}>元/场</option><option value="percent" ${c.type==='percent'?'selected':''}>%票房</option></select></div><button class="danger remove">删除</button></div>`).join('');
+ $('costs').querySelectorAll('.cost-row').forEach((row,i)=>{row.querySelector('.enabled').addEventListener('change',e=>{costs[i].enabled=e.target.checked;calculate()});row.querySelector('.cname').addEventListener('input',e=>{costs[i].name=e.target.value;calculate()});row.querySelector('.cvalue').addEventListener('input',e=>{costs[i].value=num(e.target.value);calculate()});row.querySelector('.ctype').addEventListener('change',e=>{costs[i].type=e.target.value;calculate()});row.querySelector('.remove').addEventListener('click',()=>{costs.splice(i,1);renderCosts();calculate()})});
+}
+function getInputs(){
+ const totalSeats=num($('totalSeats').value),target=num($('target').value),share=Math.min(100,num($('share').value))/100,mode=$('mode').value;
+ let fixed=0,rate=0;costs.forEach(c=>{if(c.enabled){if(c.type==='fixed')fixed+=num(c.value);else rate+=num(c.value)/100}});
+ const details=zones.map(z=>({name:z.name,seats:num(z.seats),price:num(z.price),sold:Math.min(num(z.sold),num(z.seats))}));
+ const seats=details.reduce((a,z)=>a+z.seats,0),sold=details.reduce((a,z)=>a+z.sold,0),revenue=details.reduce((a,z)=>a+z.sold*z.price,0);
+ return {totalSeats,target,share,mode,fixed,rate,details,seats,sold,revenue};
+}
+function profitFor(rev,fixed,rate,share,mode){const op=rev*(1-rate)-fixed;return mode==='gross'?rev*(1-rate-share)-fixed:op-Math.max(0,op)*share}
+function solveRevenue(v,target){if(v.mode==='gross'){let d=1-v.rate-v.share;return d>0?(v.fixed+target)/d:null}let d=(1-v.rate)*(1-v.share);return d>0?(v.fixed+target/(1-v.share||1))/(1-v.rate):null}
+function calculate(){
+ const v=getInputs(),variable=v.revenue*v.rate,operating=v.revenue-variable-v.fixed,team=v.mode==='gross'?v.revenue*v.share:Math.max(0,operating)*v.share,profit=profitFor(v.revenue,v.fixed,v.rate,v.share,v.mode);
+ const d=v.mode==='gross'?1-v.rate-v.share:(1-v.rate)*(1-v.share),breakRev=d>0?v.fixed/d:null,targetRev=solveRevenue(v,v.target),avg=v.sold?v.revenue/v.sold:null;
+ $('seatSummary').textContent=`各区合计容量 ${v.seats} 个 / 场地总座位 ${v.totalSeats} 个；${v.seats>v.totalSeats?'警告：分区容量超过场地总座位数。':v.seats<v.totalSeats?'尚有 '+(v.totalSeats-v.seats)+' 个座位未分配到区域。':'分区容量与场地座位数一致。'}`;
+ $('zones').querySelectorAll('tr').forEach((r,i)=>{if(zones[i])r.querySelector('.zrev').textContent=money(Math.min(num(zones[i].sold),num(zones[i].seats))*num(zones[i].price))});
+ $('soldTotal').textContent=v.sold.toLocaleString('zh-CN')+' 人';$('occupancy').textContent=v.seats?(v.sold/v.seats*100).toFixed(2)+'%':'—';
+ $('revenue').textContent=money(v.revenue);$('avgTicket').textContent=avg===null?'—':money(avg);$('fixed').textContent=money(v.fixed);$('variable').textContent=money(variable);$('teamPay').textContent=money(team);$('profit').textContent=money(profit);$('profit').className=profit<0?'warn':'good';
+ $('breakEven').textContent=v.sold&&breakRev!==null?money(breakRev/v.sold):'无法计算';
+ $('targetTicket').textContent=v.sold&&targetRev!==null?money(targetRev/v.sold):'无法计算';
+ let warnings=[];if(v.seats>v.totalSeats)warnings.push('各区域座位容量总和超过场地总座位数。');if(zones.some(z=>num(z.sold)>num(z.seats)))warnings.push('有区域售票人数超过座位数，计算已按该区域容量封顶。');if(v.rate>=1)warnings.push('比例费用达到或超过票房的100%。');if(v.mode==='gross'&&v.rate+v.share>=1)warnings.push('团队分成与比例费用之和达到或超过票房，目标票价无法计算。');$('warning').textContent=warnings.join(' ');
+ $('sensitivity').innerHTML=[50,60,70,80,90,95,100].map(p=>{const rev=v.details.reduce((a,z)=>a+Math.floor(z.seats*p/100)*z.price,0),n=v.details.reduce((a,z)=>a+Math.floor(z.seats*p/100),0),pr=profitFor(rev,v.fixed,v.rate,v.share,v.mode);return `<tr><td>${p}%</td><td>${n}</td><td>${money(rev)}</td><td class="${pr<0?'warn':'good'}">${money(pr)}</td></tr>`}).join('');
+}
+function snapshot(){return {totalSeats:$('totalSeats').value,target:$('target').value,share:$('share').value,mode:$('mode').value,zones,costs}}
+function applySnapshot(o){if(!o||!Array.isArray(o.zones)||!Array.isArray(o.costs))throw Error('文件格式不正确');['totalSeats','target','share'].forEach(k=>{if(o[k]!==undefined)$(k).value=o[k]});if(['gross','net'].includes(o.mode))$('mode').value=o.mode;zones=o.zones.map(z=>({name:String(z.name??'区域'),seats:num(z.seats),price:num(z.price),sold:num(z.sold)}));costs=o.costs.map(c=>({name:String(c.name??'成本项目'),type:c.type==='percent'?'percent':'fixed',value:num(c.value),enabled:!!c.enabled}));renderZones();renderCosts();calculate()}
+function download(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+['totalSeats','target','share','mode'].forEach(id=>$(id).addEventListener('input',calculate));
+$('addZone').addEventListener('click',()=>{zones.push({name:'新区域',seats:0,price:0,sold:0});renderZones();calculate()});
+$('resetZones').addEventListener('click',()=>{zones=structuredClone(defaultZones);renderZones();calculate()});
+$('addCost').addEventListener('click',()=>{costs.push({name:'新成本项目',type:'fixed',value:0,enabled:true});renderCosts();calculate()});
+$('resetCosts').addEventListener('click',()=>{costs=structuredClone(defaultCosts);renderCosts();calculate()});
+$('resetAll').addEventListener('click',()=>{if(!confirm('确定恢复全部默认值？'))return;$('totalSeats').value=600;$('target').value=20000;$('share').value=40;$('mode').value='gross';zones=structuredClone(defaultZones);costs=structuredClone(defaultCosts);renderZones();renderCosts();calculate()});
+$('exportCsv').addEventListener('click',()=>{const v=getInputs(),variable=v.revenue*v.rate,team=v.mode==='gross'?v.revenue*v.share:Math.max(0,v.revenue-variable-v.fixed)*v.share,profit=profitFor(v.revenue,v.fixed,v.rate,v.share,v.mode);let rows=[['演出票价计算结果',''],['总座位数',v.totalSeats],['分区容量合计',v.seats],['售票人数',v.sold],['总票房',v.revenue],['加权平均票价',v.sold?v.revenue/v.sold:0],['固定成本',v.fixed],['比例费用',variable],['团队分成',team],['我方经营结余',profit],['分成方式',v.mode],[],['区域','座位数','票价','售票人数','区域票房'],...v.details.map(z=>[z.name,z.seats,z.price,z.sold,z.price*z.sold]),[],['成本项目','类型','金额/比例','计入'],...costs.map(c=>[c.name,c.type,c.value,c.enabled?'是':'否'])];download('演出票价计算结果.csv','\ufeff'+rows.map(r=>r.map(x=>'"'+String(x).replace(/"/g,'""')+'"').join(',')).join('\r\n'),'text/csv;charset=utf-8')});
+$('saveJson').addEventListener('click',()=>download('演出票价参数备份.json',JSON.stringify(snapshot(),null,2),'application/json'));
+$('loadJson').addEventListener('click',()=>$('jsonFile').click());$('jsonFile').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{applySnapshot(JSON.parse(await f.text()))}catch(err){alert('导入失败：'+err.message)}e.target.value=''});
+renderZones();renderCosts();calculate();
+</script></body></html>
